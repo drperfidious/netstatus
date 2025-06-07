@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Netstatus Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 1rem;
+            background-color: #f5f5f5;
+        }
+        h1, h2 {
+            margin: 0.5rem 0;
+        }
+        .status-box {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            color: white;
+            display: inline-block;
+        }
+        .status-up {
+            background-color: #2e7d32; /* green */
+        }
+        .status-gw-down {
+            background-color: #c62828; /* red */
+        }
+        .status-in-down {
+            background-color: #ff8f00; /* orange */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            text-align: center;
+        }
+        th {
+            background-color: #1976d2;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        .small-text {
+            font-size: 0.9rem;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Network Monitor Dashboard</h1>
+
+    <!-- Current Status -->
+    {% if current_state == "UP" %}
+        <div class="status-box status-up">
+            <h2>Current State: UP</h2>
+        </div>
+    {% elif current_state == "GATEWAY_DOWN" %}
+        <div class="status-box status-gw-down">
+            <h2>Current State: GATEWAY DOWN</h2>
+        </div>
+    {% elif current_state == "INTERNET_DOWN" %}
+        <div class="status-box status-in-down">
+            <h2>Current State: INTERNET DOWN</h2>
+        </div>
+    {% else %}
+        <div class="status-box" style="background-color: #616161;">
+            <h2>Current State: UNKNOWN</h2>
+        </div>
+    {% endif %}
+
+    <!-- Summary Statistics -->
+    <h2>Statistics (last {{ total_checks }} checks)</h2>
+    <table>
+        <tr>
+            <th>Total Checks</th>
+            <th>Gateway Down</th>
+            <th>Internet Down</th>
+            <th>Uptime (%)</th>
+        </tr>
+        <tr>
+            <td>{{ total_checks }}</td>
+            <td>{{ gateway_down_count }}</td>
+            <td>{{ internet_down_count }}</td>
+            <td>{{ uptime_percent }}%</td>
+        </tr>
+    </table>
+
+    <!-- Recent Checks -->
+    <h2>Recent Checks (Newest First)</h2>
+    <table>
+        <tr>
+            <th>Timestamp</th>
+            <th>Gateway Reachable?</th>
+            <th>Internet Reachable?</th>
+            <th>State</th>
+        </tr>
+        {% for check in recent_checks[:50] %}
+        <tr>
+            <td class="small-text">{{ check.timestamp }}</td>
+            <td>{{ "✅" if check.gateway_reachable else "❌" }}</td>
+            <td>{{ "✅" if check.internet_reachable else "❌" }}</td>
+            <td>{{ check.state }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <p class="small-text">
+      Showing up to 50 most recent entries. Refresh the page to update.
+    </p>
+</body>
+</html>
