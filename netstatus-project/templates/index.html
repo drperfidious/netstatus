@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>Netstatus Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -51,6 +52,14 @@
             font-size: 0.9rem;
             color: #555;
         }
+        #chart-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+        #pingChart {
+            min-width: 800px;
+        }
     </style>
 </head>
 <body>
@@ -92,6 +101,12 @@
         </tr>
     </table>
 
+    <!-- Trends Graph -->
+    <h2>Ping Trends</h2>
+    <div id="chart-container">
+        <canvas id="pingChart"></canvas>
+    </div>
+
     <!-- Recent Checks -->
     <h2>Recent Checks (Newest First)</h2>
     <table>
@@ -114,5 +129,45 @@
     <p class="small-text">
       Showing up to 50 most recent entries. Refresh the page to update.
     </p>
+
+    <script>
+        const labels = {{ chart_labels|tojson }};
+        const gwData = {{ chart_gw|tojson }};
+        const internetData = {{ chart_internet|tojson }};
+
+        const ctx = document.getElementById('pingChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Gateway Ping (ms)',
+                        data: gwData,
+                        borderColor: '#1976d2',
+                        fill: false,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Internet Ping (ms)',
+                        data: internetData,
+                        borderColor: '#2e7d32',
+                        fill: false,
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                animation: false,
+                scales: {
+                    x: { display: false },
+                    y: { beginAtZero: true, title: { display: true, text: 'ms' } }
+                }
+            }
+        });
+
+        const container = document.getElementById('chart-container');
+        container.scrollLeft = container.scrollWidth;
+    </script>
 </body>
 </html>
