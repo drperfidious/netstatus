@@ -88,22 +88,25 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-def ping_host(host: str, timeout: int = 2) -> bool:
-    """
-    Ping `host` once. Return True if we get a reply (exit code 0), False otherwise.
-    Uses Linux/macOS arguments: `ping -c 1 -W timeout host`.
-    On Windows, you’d replace with: ["ping", "-n", "1", "-w", str(timeout*1000), host].
+def ping_host(host: str, timeout: int = 2):
+    """Ping ``host`` once.
+
+    Returns a tuple ``(ok, latency_ms)`` where ``ok`` is ``True`` if the ping
+    succeeded and ``latency_ms`` is the round trip time measured using the wall
+    clock.  When the ping fails ``latency_ms`` will be ``None``.
     """
     try:
+        start = time.perf_counter()
         result = subprocess.run(
             ["ping", "-c", "1", "-W", str(timeout), host],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
         )
-        return (result.returncode == 0)
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        return (result.returncode == 0, elapsed_ms if result.returncode == 0 else None)
     except Exception as e:
         logger.error(f"ping_host exception for {host}: {e}")
-        return False
+        return False, None
 
 
 def send_email_alert(subject: str, body: str):
@@ -144,14 +147,14 @@ def monitor_loop():
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # 1) Ping the gateway/router
-        gateway_ok = ping_host(GATEWAY_IP)
+        gateway_ok, gw_ping = ping_host(GATEWAY_IP)
 
         if not gateway_ok:
             current_state = "GATEWAY_DOWN"
             logger.warning(f"[{now}] Gateway ({GATEWAY_IP}) is NOT reachable.")
         else:
             # 2) Gateway is OK → ping external host
-            internet_ok = ping_host(INTERNET_HOST)
+            internet_ok, internet_ping = ping_host(INTERNET_HOST)
             if not internet_ok:
                 current_state = "INTERNET_DOWN"
                 logger.warning(f"[{now}] Internet is NOT reachable (gateway OK).")
@@ -159,12 +162,19 @@ def monitor_loop():
                 current_state = "UP"
                 logger.info(f"[{now}] All good: gateway & internet reachable.")
 
+        # Ensure variables exist when gateway is down
+        if not gateway_ok:
+            internet_ok = False
+            internet_ping = None
+
         # Record this check in history
         entry = {
             "timestamp": now,
             "gateway_reachable": gateway_ok,
             "internet_reachable": (gateway_ok and internet_ok),
-            "state": current_state
+            "gateway_ping_ms": gw_ping,
+            "internet_ping_ms": internet_ping,
+            "state": current_state,
         }
         with history_lock:
             history.append(entry)
@@ -225,6 +235,11 @@ def index():
     # Latest state (if history empty, show "Unknown")
     current_state = hist_copy[-1]["state"] if hist_copy else "Unknown"
 
+    # Data for trends graph (chronological order)
+    labels = [e["timestamp"] for e in hist_copy]
+    gw_pings = [e.get("gateway_ping_ms") for e in hist_copy]
+    internet_pings = [e.get("internet_ping_ms") for e in hist_copy]
+
     return render_template(
         "index.html",
         current_state=current_state,
@@ -232,7 +247,10 @@ def index():
         gateway_down_count=gateway_down_count,
         internet_down_count=internet_down_count,
         uptime_percent=round(uptime_percent, 2),
-        recent_checks=hist_copy[::-1]  # reverse chronological
+        recent_checks=hist_copy[::-1],  # reverse chronological
+        chart_labels=labels,
+        chart_gw=gw_pings,
+        chart_internet=internet_pings,
     )
 
 
